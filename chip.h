@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void initChar(unsigned char* arr);
-
 class Chip {
 private:
 	// current opcode -- two bytes in 8-chip
