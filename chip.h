@@ -2,7 +2,7 @@
 
 class Chip {
 private:
-	// an opcode -- type chosen since they are all two bytes in 8-chip
+	// current opcode -- two bytes in 8-chip
 	unsigned short opcode;
 
 	// has 4096 bytes of memory
