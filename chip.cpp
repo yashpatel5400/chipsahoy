@@ -3,6 +3,9 @@
 // all information obtained from: 
 // https://en.wikipedia.org/wiki/CHIP-8#Virtual_machine_description
 
+Chip::Chip() {}
+Chip::~Chip () {}
+
 void Chip::initialize() {
 	/* Chips is laid out as follows:
 	0x000-0x1FF : memory
@@ -48,6 +51,7 @@ void Chip::initialize() {
 	// resets the timers to default 0 value since not activated
 	delayTimer = 0;
 	soundTimer = 0;
+	drawFlag   = false;
 }
 
 void Chip::loadGame(char* name) {
@@ -104,7 +108,8 @@ void Chip::emulateCycle() {
 			switch (opcode & 0x000F) {
 				// 0x00E0: Clears the screen.
 				case 0x0000: 
-					for (int i = 0; i < 64 * 32; i++) gfx[i] = 0;
+					for (int i = 0; i < 64 * 32; i++) gfx[i] = 0x0;
+					drawFlag = true;
 					pc += 2;
 				break;
 
@@ -112,13 +117,11 @@ void Chip::emulateCycle() {
 				case 0x000E: 
 					sp--;
 					pc = stack[sp];
-				break;
 
-				//	0x0NNN: Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-				default:
-					stack[sp] = pc;
-					sp++;
-					pc = opcode & 0x0FFF;
+					// after returning from the subroutine, have to move to next
+					// instruction otherwise will repeat the subroutine
+					pc += 2;
+				break;
 			}
 		break;
 
@@ -237,7 +240,7 @@ void Chip::emulateCycle() {
 				// 0x8XYE: Shifts VX left by one VF is set to the value of the most 
 				// significant bit of VX before the shift
 				case 0x000E: 
-					registers[0x000F] = (VX & 0x1);
+					registers[0x000F] = VX >> 7;
 					registers[(opcode & 0x0F00) >> 8] <<= 1;
 				break;
 
@@ -266,8 +269,6 @@ void Chip::emulateCycle() {
 
 		// 0xBNNN: Jumps to the address NNN plus V0
 		case 0xB000:
-			stack[sp] = pc;
-			sp++;
 			pc = memory[(opcode & 0x0FFF) + registers[0]];
 		break;
 
@@ -277,7 +278,7 @@ void Chip::emulateCycle() {
 			srand(time(NULL));
 
 			// random number between 0 and 255
-			int randN = rand() % 255 + 1;
+			int randN = rand() % 0xFF;
 			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & randN;
 			pc += 2;
 		}
@@ -296,10 +297,10 @@ void Chip::emulateCycle() {
 
 			bool unsetSprite = false;
 
-			for (unsigned char i = 0x0; i < N; i += 0x1) {
-				for (unsigned char j = 0x0; j < 0x8; j += 0x1) {
+			for (int y = 0; y < N; y++) {
+				unsigned curPixel = memory[I + y];
+				for (int x = 0; x < 8; x++) {
 					unsigned char prev   = gfx[i * 0x8 + j];
-					unsigned char update = memory[I + i * 0x8 + j];
 					if (prev == 0x01 && update == 0x00 && !unsetSprite)
 						unsetSprite = true;
 					gfx[i * 0x8 + j] = update;
@@ -307,6 +308,8 @@ void Chip::emulateCycle() {
 			}
 
 			if (unsetSprite) registers[0x000F] = 0x1;
+			else registers[0x000F] = 0x0;
+			drawFlag = true;
 			pc += 2;
 		}
 		break;
@@ -343,8 +346,20 @@ void Chip::emulateCycle() {
 
 				// 0xFX0A: A key press is awaited, and then stored in VX 
 				// (Blocking Operation All instruction halted until next key event)
-				case 0x000A: 
-					registers[(opcode & 0x0F00) >> 8] = getch();
+				case 0x000A: {
+					bool keyPressed = false;
+
+					for (int i = 0; i < 16; i++) {
+						if (keys[i] != 0) {
+							registers[(opcode & 0x0F00) >> 8] = i;
+							keyPressed = true;
+						}
+					}
+
+					// didn't receive input: runs same command again to see if
+					// gets any input (i.e. does not change program counter)
+					if (!keyPressed) return;
+				}
 				break;
 
 				// 0xFX15: Sets the delay timer to VX
@@ -360,6 +375,8 @@ void Chip::emulateCycle() {
 				// 0xFX1E: Adds VX to I
 				case 0x001E:
 					I += registers[(opcode & 0x0F00) >> 8];
+					if (I & 0x0F00 != 0x0000) registers[0xF] = 1;
+					else registers[0xF] = 0;
 				break;
 
 				// 0xFX29: Sets I to the location of the sprite for the 
@@ -379,15 +396,17 @@ void Chip::emulateCycle() {
 					int num = registers[(opcode & 0x0F00) >> 8];
 					memory[I]   = num % 100;
 					memory[I+1] = (num - memory[I] * 100) % 10;
-					memory[I+2] = (memory[I] - memory[I+1] * 10);
+					memory[I+2] = (num - memory[I] * 100 - memory[I+1] * 10);
 				}
 				break;
 
 				// 0xFX55: Stores V0 to VX (including VX) in memory starting at address I
 				case 0x0055: {
 					unsigned char end = ((opcode & 0x0F00) >> 8);
-					for (unsigned char offset = 0x0; offset < end; offset += 0x1)
+					for (int offset = 0; offset < end; offset++)
 						memory[I + offset] = registers[offset];
+
+					I += ((opcode & 0x0F00) >> 8) + 1;
 				}
 				break;
 
@@ -395,8 +414,10 @@ void Chip::emulateCycle() {
 				// starting at address I
 				case 0x0065: {
 					unsigned char end = ((opcode & 0x0F00) >> 8);
-					for (unsigned char offset = 0x0; offset < end; offset += 0x1)
+					for (int offset = 0; offset < end; offset++)
 						registers[offset] = memory[I + offset];
+
+					I += ((opcode & 0x0F00) >> 8) + 1;
 				}
 				break;
 
@@ -418,8 +439,4 @@ void Chip::emulateCycle() {
 		printf("BEEP!\n");
 		soundTimer--;
 	}
-}
-
-void Chip::setKeys() {
-
 }

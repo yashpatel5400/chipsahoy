@@ -37,11 +37,17 @@ private:
 	unsigned short sp;
 
 	// keypad used for inputting into system: hex
-	unsigned char key[16];
+	unsigned char keys[16];
+
+	// flag indicating whether or not the chip graphics should be displayed
+	bool drawFlag; 
 
 public:
+	Chip();
+	~Chip();
+
 	void initialize();
 	void loadGame(char* name);
 	void emulateCycle();
-	void setKeys();
+	// void setKeys();
 };
