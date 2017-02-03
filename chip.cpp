@@ -36,13 +36,10 @@ void Chip::initialize() {
 	pc	   = 0;
 
 	// clear the storage items: memory, stack, graphics, and registers
-	// all of the first three are 1-bit unsigned chars
-	for (int i = 0; i < 4096; i++)    memory[i] = 0x0;
-	for (int i = 0; i < 16; i++)      registers[i] = 0x0;
-	for (int i = 0; i < 64 * 32; i++) gfx[i] = 0x0;
-
-	// stack is a list of 2-byte shorts, so slightly different
-	for (int i = 0; i < 16; i++) stack[i] = 0x00;
+	for (int i = 0; i < 4096; i++)    memory[i] = 0;
+	for (int i = 0; i < 16; i++)      registers[i] = 0;
+	for (int i = 0; i < 64 * 32; i++) gfx[i] = 0;
+	for (int i = 0; i < 16; i++)      stack[i] = 0;
 
 	// initializes the memory and registers
 	for (int i = 0; i < 80; i++)
@@ -107,6 +104,8 @@ void Chip::emulateCycle() {
 			switch (opcode & 0x000F) {
 				// 0x00E0: Clears the screen.
 				case 0x0000: 
+					for (int i = 0; i < 64 * 32; i++) gfx[i] = 0;
+					pc += 2;
 				break;
 
 				// 0x00EE: Returns from a subroutine.
@@ -223,7 +222,7 @@ void Chip::emulateCycle() {
 				// 0x8XY6: Shifts VX right by one VF is set to the value of the least 
 				// significant bit of VX before the shift
 				case 0x0006: 
-					registers[0x000F] = (VX & 0x000F);
+					registers[0x000F] = (VX & 0x1);
 					registers[(opcode & 0x0F00) >> 8] >>= 1;
 				break;
 
@@ -238,7 +237,7 @@ void Chip::emulateCycle() {
 				// 0x8XYE: Shifts VX left by one VF is set to the value of the most 
 				// significant bit of VX before the shift
 				case 0x000E: 
-					registers[0x000F] = (VX & 0xF000);
+					registers[0x000F] = (VX & 0x1);
 					registers[(opcode & 0x0F00) >> 8] <<= 1;
 				break;
 
@@ -279,7 +278,8 @@ void Chip::emulateCycle() {
 
 			// random number between 0 and 255
 			int randN = rand() % 255 + 1;
-			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & randN;		
+			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & randN;
+			pc += 2;
 		}
 		break;
 
@@ -289,7 +289,26 @@ void Chip::emulateCycle() {
 		// this instruction As described above, VF is set to 1 if any screen pixels 
 		// are flipped from set to unset when the sprite is drawn, and to 0 if 
 		// that doesn’t happen
-		case 0xD000: 
+		case 0xD000: {
+			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
+			unsigned char VY = registers[(opcode & 0x00F0) >> 4];
+			unsigned char N  = opcode & 0x000F;
+
+			bool unsetSprite = false;
+
+			for (unsigned char i = 0x0; i < N; i += 0x1) {
+				for (unsigned char j = 0x0; j < 0x8; j += 0x1) {
+					unsigned char prev   = gfx[i * 0x8 + j];
+					unsigned char update = memory[I + i * 0x8 + j];
+					if (prev == 0x01 && update == 0x00 && !unsetSprite)
+						unsetSprite = true;
+					gfx[i * 0x8 + j] = update;
+				}
+			}
+
+			if (unsetSprite) registers[0x000F] = 0x1;
+			pc += 2;
+		}
 		break;
 
 		case 0xE000: 
@@ -298,12 +317,16 @@ void Chip::emulateCycle() {
 				// VX isn't pressed (Usually the next instruction is a jump
 				// to skip a code block)
 				case 0x0001: 
+					if (keys[registers[(opcode & 0x0F00) >> 8]] == 0) pc += 4;
+					else pc += 2;
 				break;
 
 				// 0xEX9E: Skips the next instruction if the key 
 				// stored in VX is pressed (Usually the next instruction is a 
 				// jump to skip a code block)
-				case 0x000E: 
+				case 0x000E:
+					if (keys[registers[(opcode & 0x0F00) >> 8]] != 0) pc += 4;
+					else pc += 2; 
 				break;
 
 				default:
@@ -343,7 +366,7 @@ void Chip::emulateCycle() {
 				// character in VX Characters 0-F (in hexadecimal) are 
 				// represented by a 4x5 font
 				case 0x0029:
-
+					I = keys[registers[(opcode & 0x0F00) >> 8]];
 				break;
 
 				// 0xFX33: Stores the binary-coded decimal representation of VX, w/ most
@@ -352,7 +375,12 @@ void Chip::emulateCycle() {
 				// words, take the decimal representation of VX, place the hundreds digit
 				// in memory at location in I, the tens digit at location I+1, and the 
 				// ones digit at location I+2)
-				case 0x0033: 
+				case 0x0033: {
+					int num = registers[(opcode & 0x0F00) >> 8];
+					memory[I]   = num % 100;
+					memory[I+1] = (num - memory[I] * 100) % 10;
+					memory[I+2] = (memory[I] - memory[I+1] * 10);
+				}
 				break;
 
 				// 0xFX55: Stores V0 to VX (including VX) in memory starting at address I
@@ -375,6 +403,7 @@ void Chip::emulateCycle() {
 				default:
 					printf("Unknown opcode supplied: %X", opcode);
 			}
+			pc += 2;
 		break;
 
 		default:
