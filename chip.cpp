@@ -300,15 +300,13 @@ void Chip::emulateCycle() {
 			for (int y = 0; y < N; y++) {
 				unsigned curPixel = memory[I + y];
 				for (int x = 0; x < 8; x++) {
-					unsigned char prev   = gfx[i * 0x8 + j];
-					if (prev == 0x01 && update == 0x00 && !unsetSprite)
-						unsetSprite = true;
-					gfx[i * 0x8 + j] = update;
+					if (gfx[VX + x + (VY + y) * 64] == 1) unsetSprite = true;
+					gfx[VX + x + (VY + y) * 64] ^= 1;
 				}
 			}
 
-			if (unsetSprite) registers[0x000F] = 0x1;
-			else registers[0x000F] = 0x0;
+			if (unsetSprite) registers[0xF] = 1;
+			else registers[0xF] = 0;
 			drawFlag = true;
 			pc += 2;
 		}
