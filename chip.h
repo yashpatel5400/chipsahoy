@@ -2,9 +2,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+#include <curses.h>
 
 class Chip {
 private:
+	unsigned char* chip8_fontset;
+
 	// current opcode -- two bytes in 8-chip
 	unsigned short opcode;
 
@@ -25,8 +29,8 @@ private:
 	unsigned char gfx[64 * 32];
 
 	// two timers: delay and sound, both counting down from 60 for refresh
-	unsigned char delay_timer;
-	unsigned char sound_timer;
+	unsigned char delayTimer;
+	unsigned char soundTimer;
 
 	// stack and stack pointer to determine where coming from in goto
 	unsigned short stack[16];

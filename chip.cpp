@@ -8,6 +8,24 @@ void Chip::initialize() {
 	0x000-0x1FF : memory
 	0x050-0x0A0 - Used for the built in 4x5 pixel font set (0-F)
 	0x200-0xFFF - Program ROM and work RAM */
+	unsigned char chip8_fontset[80] = { 
+		0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+		0x20, 0x60, 0x20, 0x20, 0x70, // 1
+		0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+		0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+		0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+		0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+		0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+		0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+		0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+		0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+		0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+		0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+		0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+		0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+		0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+		0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+	};
 
 	// sets the program counter to where in memory the program ROM/work RAM
 	pc = 0x200;
@@ -28,11 +46,11 @@ void Chip::initialize() {
 
 	// initializes the memory and registers
 	for (int i = 0; i < 80; i++)
-		memory[i] = chip_fontset[i];
+		memory[i] = chip8_fontset[i];
 
 	// resets the timers to default 0 value since not activated
-	delay_timer = 0;
-	sound_timer = 0;
+	delayTimer = 0;
+	soundTimer = 0;
 }
 
 void Chip::loadGame(char* name) {
@@ -119,50 +137,55 @@ void Chip::emulateCycle() {
 
 		// 0x3XNN: Skips the next instruction if VX equals NN. (Usually the next 
 		// instruction is a jump to skip a code block)
-		case 0x3000: 
+		case 0x3000: {
 			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
 			unsigned char NN = opcode & 0x00FF;
 			if (VX == NN) pc += 4;
 			else pc += 2;
+		}
 		break;
 
 		// 0x4XNN: Skips the next instruction if VX doesn't equal NN. (Usually 
 		// the next instruction is a jump to skip a code block)
-		case 0x4000: 
+		case 0x4000: {
 			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
 			unsigned char NN = opcode & 0x00FF;
 			if (VX != NN) pc += 4;
 			else pc += 2;
+		}
 		break;
 
 		// 0x5XY0Skips the next instruction if VX equals VY. (Usually the 
 		// next instruction is a jump to skip a code block)
-		case 0x5000:
+		case 0x5000: {
 			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
-			unsigned char VY = registers[(opcode & 0x00F0) >> 8];
+			unsigned char VY = registers[(opcode & 0x00F0) >> 4];
 			if (VX == VY) pc += 4;
 			else pc += 2;
+		}
 		break;
 
 		// 0x6XNN: Sets VX to NN
-		case 0x6000:
+		case 0x6000: {
 			unsigned char NN = opcode & 0x00FF;
 			registers[(opcode & 0x0F00) >> 8] = NN;
 			pc += 2;
+		}
 		break;
 
 		// 0x7XNN: Adds NN to VX
-		case 0x7000:
+		case 0x7000: {
 			unsigned char NN = opcode & 0x00FF;
 			registers[(opcode & 0x0F00) >> 8] += NN;
 			pc += 2;
+		}
 		break;
 
-		case 0x8000:
-			switch (opcode & 0x000F) {
-				unsigned char VX = registers[(opcode & 0x0F00) >> 8];
-				unsigned char VY = registers[(opcode & 0x00F0) >> 4];
+		case 0x8000: {
+			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
+			unsigned char VY = registers[(opcode & 0x00F0) >> 4];
 
+			switch (opcode & 0x000F) {
 				// 0x8XY0: Sets VX to the value of VY
 				case 0x0000:
 					registers[(opcode & 0x0F00) >> 8] = VY;
@@ -208,24 +231,32 @@ void Chip::emulateCycle() {
 				// and 1 when there isn't
 				case 0x0007: 
 					registers[(opcode & 0x0F00) >> 8] += VY;
-					unsigned short result = registers[(opcode & 0x0F00) >> 8] & 0xF0;
-					registers[0x000F] = (0x10 - result) >> 4;
+					registers[0x000F] = (0x10 - 
+						registers[(opcode & 0x0F00) >> 8] & 0xF0) >> 4;
 				break;
 
 				// 0x8XYE: Shifts VX left by one VF is set to the value of the most 
 				// significant bit of VX before the shift
 				case 0x000E: 
+					registers[0x000F] = (VX & 0xF000);
+					registers[(opcode & 0x0F00) >> 8] <<= 1;
 				break;
 
 				default:
 					printf("Unknown opcode supplied: %X", opcode);
 			}
 			pc += 2;
+		}
 		break;
 
 		// 0x9XY0: Skips the next instruction if VX doesn't equal VY (Usually the 
 		// next instruction is a jump to skip a code block)
-		case 0x9000: 
+		case 0x9000: {
+			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
+			unsigned char VY = registers[(opcode & 0x00F0) >> 4];
+			if (VX != VY) pc += 4;
+			else pc += 2;
+		}
 		break;
 
 		// 0xANNN: Sets I to the address NNN
@@ -235,12 +266,21 @@ void Chip::emulateCycle() {
 		break;
 
 		// 0xBNNN: Jumps to the address NNN plus V0
-		case 0xB000: 
+		case 0xB000:
+			stack[sp] = pc;
+			sp++;
+			pc = memory[(opcode & 0x0FFF) + registers[0]];
 		break;
 
 		// 0xCXNN: Sets VX to the result of a bitwise and operation on a random number 
 		// (Typically: 0 to 255) and NN
-		case 0xC000: 
+		case 0xC000: {
+			srand(time(NULL));
+
+			// random number between 0 and 255
+			int randN = rand() % 255 + 1;
+			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & randN;		
+		}
 		break;
 
 		// 0xDXYN: Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and 
@@ -275,29 +315,35 @@ void Chip::emulateCycle() {
 			switch (opcode & 0x00FF) {
 				// 0xFX07: Sets VX to the value of the delay timer
 				case 0x0007: 
+					registers[(opcode & 0x0F00) >> 8] = delayTimer;
 				break;
 
 				// 0xFX0A: A key press is awaited, and then stored in VX 
 				// (Blocking Operation All instruction halted until next key event)
 				case 0x000A: 
+					registers[(opcode & 0x0F00) >> 8] = getch();
 				break;
 
 				// 0xFX15: Sets the delay timer to VX
 				case 0x0015: 
+					delayTimer = registers[(opcode & 0x0F00) >> 8];
 				break;
 
 				// 0xFX18: Sets the sound timer to VX
-				case 0x0018: 
+				case 0x0018:
+					soundTimer = registers[(opcode & 0x0F00) >> 8];
 				break;
 
 				// 0xFX1E: Adds VX to I
-				case 0x001E: 
+				case 0x001E:
+					I += registers[(opcode & 0x0F00) >> 8];
 				break;
 
 				// 0xFX29: Sets I to the location of the sprite for the 
 				// character in VX Characters 0-F (in hexadecimal) are 
 				// represented by a 4x5 font
-				case 0x0029: 
+				case 0x0029:
+
 				break;
 
 				// 0xFX33: Stores the binary-coded decimal representation of VX, w/ most
@@ -310,12 +356,20 @@ void Chip::emulateCycle() {
 				break;
 
 				// 0xFX55: Stores V0 to VX (including VX) in memory starting at address I
-				case 0x0055: 
+				case 0x0055: {
+					unsigned char end = ((opcode & 0x0F00) >> 8);
+					for (unsigned char offset = 0x0; offset < end; offset += 0x1)
+						memory[I + offset] = registers[offset];
+				}
 				break;
 
 				// 0xFX65: Fills V0 to VX (including VX) with values from memory 
 				// starting at address I
-				case 0x0065: 
+				case 0x0065: {
+					unsigned char end = ((opcode & 0x0F00) >> 8);
+					for (unsigned char offset = 0x0; offset < end; offset += 0x1)
+						registers[offset] = memory[I + offset];
+				}
 				break;
 
 				default:
@@ -328,12 +382,12 @@ void Chip::emulateCycle() {
 	}
 
 	// updates the timers (i.e. decrements or resets)
-	if (delay_timer > 0)
-		delay_timer--;
+	if (delayTimer > 0)
+		delayTimer--;
 
-	if (sound_timer > 0) {
+	if (soundTimer > 0) {
 		printf("BEEP!\n");
-		sound_timer--;
+		soundTimer--;
 	}
 }
 
