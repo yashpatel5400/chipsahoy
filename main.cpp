@@ -1,5 +1,7 @@
 #include "chip.h"
 #include <SDL2/SDL.h>
+#include <chrono>
+#include <thread>
 
 Chip chip8;
 
@@ -10,12 +12,12 @@ int STRETCH = 10;
 
 // corresponds to the letters to be used for input following: 
 // https://www.libsdl.org/release/SDL-1.2.15/docs/html/guideinputkeyboard.html
-uint8_t keypad[16] = {
+uint8_t keymap[16] = {
 	SDLK_1, SDLK_2,  SDLK_3,  SDLK_4,
 	SDLK_q, SDLK_w,  SDLK_e,  SDLK_r,
 	SDLK_a, SDLK_s,  SDLK_d,  SDLK_f,
 	SDLK_z, SDLK_x,  SDLK_c,  SDLK_v,
-}
+};
 
 void confirmCreated(void* obj) {
 	if (obj == NULL) {
@@ -28,7 +30,7 @@ void initializeGraphics(SDL_Window* window, SDL_Renderer* renderer,
 	SDL_Texture *texture) {
 	
 	window = SDL_CreateWindow("chipsahoy", 
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, // initial positions
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, // initial positions
 		chip8.width * STRETCH, chip8.height * STRETCH,  // width + height
 		SDL_WINDOW_SHOWN
 	);
@@ -36,6 +38,8 @@ void initializeGraphics(SDL_Window* window, SDL_Renderer* renderer,
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	confirmCreated(renderer);
+	SDL_RenderSetLogicalSize(renderer, 
+		chip8.width * STRETCH, chip8.height * STRETCH);
 
 	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
 		SDL_TEXTUREACCESS_TARGET, 1024, 768); // width and height;
@@ -43,7 +47,11 @@ void initializeGraphics(SDL_Window* window, SDL_Renderer* renderer,
 }
 
 int main(int argc, char **argv) {
-	if (!SDL_Init(SDL_INIT_EVERYTHING)) {
+	// initializes the chip and loads the game
+	chip8.initialize();
+	chip8.loadGame((char*) "invaders.c8");
+	
+	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		printf("Could not initialize SDL!");
 		exit(EXIT_FAILURE);
 	}
@@ -58,21 +66,19 @@ int main(int argc, char **argv) {
 	SDL_Texture *texture;
 	initializeGraphics(window, renderer, texture);
 
-	// initializes the chip and loads the game
-	chip8.initialize();
-	chip8.loadGame((char*) "invaders.c8");
+	// screen buffer used for transferring from internal chip graphics storage
+	// to pixel data
+	uint32_t screen[2048];
 
 	// main game loop
 	while (!quit) {
 		chip8.emulateCycle();
-		printf("emulated\n");
-
 		while(SDL_PollEvent(&event) ){
 			switch(event.type){
 				case SDL_KEYDOWN:
-					if (e.key.keysym.sym == SDLK_ESCAPE) quit = 1;
+					if (event.key.keysym.sym == SDLK_ESCAPE) quit = 1;
 					for (int i = 0; i < 16; i++) {
-						if (e.key.keysym.sym == keypad[i]) {
+						if (event.key.keysym.sym == keymap[i]) {
 							chip8.keys[i] = 1;
 						}
 					}
@@ -81,7 +87,7 @@ int main(int argc, char **argv) {
 
 				case SDL_KEYUP:
 					for (int i = 0; i < 16; i++) {
-						if (e.key.keysym.sym == keypad[i]) {
+						if (event.key.keysym.sym == keymap[i]) {
 							chip8.keys[i] = 0;
 						}
 					}
@@ -99,24 +105,27 @@ int main(int argc, char **argv) {
 
 		// if the refresh flag has reached refresh, updates the screen
 		if (chip8.drawFlag) {
-			SDL_RenderClear(renderer);
-
 			for (int y = 0; y < chip8.height; y++) {
 				for (int x = 0; x < chip8.width; x++) {
-					SDL_Rect curPixel;
-					curPixel.w = STRETCH;
-					curPixel.h = STRETCH;
-					curPixel.x = x * STRETCH;
-					curPixel.y = y * STRETCH;
-
-					if (chip8.gfx[y * chip8.width + x] == 1)
-						glColor3f(1.0f, 1.0f, 1.0f);
-					else glColor3f(0.0f, 0.0f, 0.0f);
+					unsigned char curPixel = chip8.gfx[y * chip8.width + x];
+					screen[y * chip8.width + x] = (0x00FFFFFF * curPixel) | 0xFF000000;
 				}
 			}
 
+			SDL_UpdateTexture(texture,
+				NULL,  // area updating -- NULL to update entire area
+				screen, // the raw pixel data
+				chip8.width * sizeof(Uint32) // the number of bytes in a row of pixel data)
+			);
+			SDL_RenderClear(renderer);
+			SDL_RenderCopy(renderer, texture, NULL, NULL);
+            SDL_RenderPresent(renderer);
+
 			chip8.drawFlag = false;
 		}
+
+		// matches the clock speed of the Chip8 processor
+		std::this_thread::sleep_for(std::chrono::microseconds(1200));
 	}
 
 	SDL_DestroyWindow(window);
