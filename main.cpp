@@ -27,9 +27,14 @@ void confirmCreated(void* obj) {
 }
 
 int main(int argc, char **argv) {
+	if (argc != 2) {
+		printf("Usage: chip <ROM (w/ directory)>");
+		exit(EXIT_FAILURE);
+	}
+
 	// initializes the chip and loads the game
 	chip8.initialize();
-	chip8.loadGame("roms/PONG");
+	chip8.loadGame(argv[1]);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		printf("Could not initialize SDL!");
