@@ -24,10 +24,6 @@ private:
 	// program counter -- 16-bit register
 	unsigned short pc;	
 
-	// outputs graphics display of black/white (binary = 1 byte)
-	// of 64 x 32
-	unsigned char gfx[64 * 32];
-
 	// two timers: delay and sound, both counting down from 60 for refresh
 	unsigned char delayTimer;
 	unsigned char soundTimer;
@@ -36,12 +32,6 @@ private:
 	unsigned short stack[16];
 	unsigned short sp;
 
-	// keypad used for inputting into system: hex
-	unsigned char keys[16];
-
-	// flag indicating whether or not the chip graphics should be displayed
-	bool drawFlag; 
-
 public:
 	Chip();
 	~Chip();
@@ -49,5 +39,17 @@ public:
 	void initialize();
 	void loadGame(char* name);
 	void emulateCycle();
-	// void setKeys();
+
+	// flag indicating whether or not the chip graphics should be displayed
+	bool drawFlag; 
+
+	// keypad used for inputting into system: hex
+	unsigned char keys[16];
+
+	// width and height of the chip display graphics output
+	int width;
+	int height;
+
+	// outputs graphics display of black/white (binary = 1 byte) of 64 x 32
+	unsigned char gfx[64 * 32];
 };

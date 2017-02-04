@@ -7,6 +7,10 @@ Chip::Chip() {}
 Chip::~Chip () {}
 
 void Chip::initialize() {
+	// initializes the display sizes -- fixed by Chip
+	width  = 64;
+	height = 32;
+
 	/* Chips is laid out as follows:
 	0x000-0x1FF : memory
 	0x050-0x0A0 - Used for the built in 4x5 pixel font set (0-F)
@@ -300,6 +304,7 @@ void Chip::emulateCycle() {
 			for (int y = 0; y < N; y++) {
 				unsigned curPixel = memory[I + y];
 				for (int x = 0; x < 8; x++) {
+					// 64 comes from the fact that screen is 64x32
 					if (gfx[VX + x + (VY + y) * 64] == 1) unsetSprite = true;
 					gfx[VX + x + (VY + y) * 64] ^= 1;
 				}
