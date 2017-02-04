@@ -26,31 +26,11 @@ void confirmCreated(void* obj) {
 	}
 }
 
-void initializeGraphics(SDL_Window* window, SDL_Renderer* renderer, 
-	SDL_Texture *texture) {
-	
-	window = SDL_CreateWindow("chipsahoy", 
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, // initial positions
-		chip8.width * STRETCH, chip8.height * STRETCH,  // width + height
-		SDL_WINDOW_SHOWN
-	);
-	confirmCreated(window);
-
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	confirmCreated(renderer);
-	SDL_RenderSetLogicalSize(renderer, 
-		chip8.width * STRETCH, chip8.height * STRETCH);
-
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, 
-		SDL_TEXTUREACCESS_TARGET, 1024, 768); // width and height;
-	confirmCreated(texture);
-}
-
 int main(int argc, char **argv) {
 	// initializes the chip and loads the game
 	chip8.initialize();
-	chip8.loadGame((char*) "invaders.c8");
-	
+	chip8.loadGame((char*) "INVADERS");
+
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		printf("Could not initialize SDL!");
 		exit(EXIT_FAILURE);
@@ -61,14 +41,25 @@ int main(int argc, char **argv) {
 	int quit = 0;
 
 	// declare all objects used for rendering to be initialized
-	SDL_Window* window;
-	SDL_Renderer* renderer;
-	SDL_Texture *texture;
-	initializeGraphics(window, renderer, texture);
+	SDL_Window *window = SDL_CreateWindow("chipsahoy", 
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, // initial positions
+		chip8.width * STRETCH, chip8.height * STRETCH,  // width + height
+		SDL_WINDOW_SHOWN
+	);
+	confirmCreated(window);
+
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	confirmCreated(renderer);
+	SDL_RenderSetLogicalSize(renderer, 
+		chip8.width * STRETCH, chip8.height * STRETCH);
+
+	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
+		SDL_TEXTUREACCESS_STREAMING, 64, 32); // width and height;
+	confirmCreated(texture);
 
 	// screen buffer used for transferring from internal chip graphics storage
 	// to pixel data
-	uint32_t screen[2048];
+	uint32_t screen[64 * 32];
 
 	// main game loop
 	while (!quit) {
