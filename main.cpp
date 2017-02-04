@@ -29,7 +29,7 @@ void confirmCreated(void* obj) {
 int main(int argc, char **argv) {
 	// initializes the chip and loads the game
 	chip8.initialize();
-	chip8.loadGame((char*) "INVADERS");
+	chip8.loadGame("roms/PONG");
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		printf("Could not initialize SDL!");
@@ -40,22 +40,26 @@ int main(int argc, char **argv) {
 	SDL_Event event;
 	int quit = 0;
 
-	// declare all objects used for rendering to be initialized
-	SDL_Window *window = SDL_CreateWindow("chipsahoy", 
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, // initial positions
-		chip8.width * STRETCH, chip8.height * STRETCH,  // width + height
-		SDL_WINDOW_SHOWN
+	// Create window
+	SDL_Window* window = SDL_CreateWindow(
+		"chipsahoy",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		chip8.width * STRETCH, chip8.height * STRETCH, SDL_WINDOW_SHOWN
 	);
-	confirmCreated(window);
+	if (window == NULL){
+		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
 
+	// Create renderer
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-	confirmCreated(renderer);
-	SDL_RenderSetLogicalSize(renderer, 
-		chip8.width * STRETCH, chip8.height * STRETCH);
+	SDL_RenderSetLogicalSize(renderer, chip8.width * STRETCH, chip8.height * STRETCH);
 
-	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, 
-		SDL_TEXTUREACCESS_STREAMING, 64, 32); // width and height;
-	confirmCreated(texture);
+	// Create texture that stores frame buffer
+	SDL_Texture* texture = SDL_CreateTexture(renderer,
+		SDL_PIXELFORMAT_ARGB8888,
+		SDL_TEXTUREACCESS_STREAMING,
+		64, 32);
 
 	// screen buffer used for transferring from internal chip graphics storage
 	// to pixel data
@@ -73,7 +77,6 @@ int main(int argc, char **argv) {
 							chip8.keys[i] = 1;
 						}
 					}
-
 					break;
 
 				case SDL_KEYUP:
@@ -110,7 +113,7 @@ int main(int argc, char **argv) {
 			);
 			SDL_RenderClear(renderer);
 			SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
+			SDL_RenderPresent(renderer);
 
 			chip8.drawFlag = false;
 		}

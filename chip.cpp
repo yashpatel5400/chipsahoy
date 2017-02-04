@@ -40,10 +40,11 @@ void Chip::initialize() {
 	// sets all the registers to default values and opcode since not executing
 	opcode = 0;
 	I	   = 0;
-	pc	   = 0;
+	sp	   = 0;
 
 	// clear the storage items: memory, stack, graphics, and registers
 	for (int i = 0; i < 4096; i++)    memory[i] = 0;
+	for (int i = 0; i < 16; i++)      keys[i] = 0;
 	for (int i = 0; i < 16; i++)      registers[i] = 0;
 	for (int i = 0; i < 64 * 32; i++) gfx[i] = 0;
 	for (int i = 0; i < 16; i++)      stack[i] = 0;
@@ -55,7 +56,6 @@ void Chip::initialize() {
 	// resets the timers to default 0 value since not activated
 	delayTimer = 0;
 	soundTimer = 0;
-	drawFlag   = false;
 }
 
 void Chip::loadGame(char* name) {
@@ -105,15 +105,14 @@ void Chip::emulateCycle() {
 	// since the memory locations are 1 byte and opcodes are 2, we need to
 	// combine the two contiguous ones to get current opcode
 	opcode = memory[pc] << 8 | memory[pc + 1];
-	printf("Testing: %X\n", opcode);
-	printf("====================\n");
+	
 	// decodes the opcode i.e. determine what it does + execute
 	switch (opcode & 0xF000) {
 		case 0x0000:
 			switch (opcode & 0x000F) {
 				// 0x00E0: Clears the screen.
 				case 0x0000: 
-					for (int i = 0; i < 64 * 32; i++) gfx[i] = 0x0;
+					for (int i = 0; i < 64 * 32; i++) gfx[i] = 0;
 					drawFlag = true;
 					pc += 2;
 				break;
@@ -274,7 +273,7 @@ void Chip::emulateCycle() {
 
 		// 0xBNNN: Jumps to the address NNN plus V0
 		case 0xB000:
-			pc = memory[(opcode & 0x0FFF) + registers[0]];
+			pc = (opcode & 0x0FFF) + registers[0];
 		break;
 
 		// 0xCXNN: Sets VX to the result of a bitwise and operation on a random number 
@@ -283,8 +282,7 @@ void Chip::emulateCycle() {
 			srand(time(NULL));
 
 			// random number between 0 and 255
-			int randN = rand() % 0xFF;
-			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & randN;
+			registers[(opcode & 0x0F00) >> 8] =	(opcode & 0x00FF) & (rand() % 0xFF);
 			pc += 2;
 		}
 		break;
@@ -295,6 +293,7 @@ void Chip::emulateCycle() {
 		// this instruction As described above, VF is set to 1 if any screen pixels 
 		// are flipped from set to unset when the sprite is drawn, and to 0 if 
 		// that doesn’t happen
+		// NOTE: code taken from the tutorial
 		case 0xD000: {
 			unsigned char VX = registers[(opcode & 0x0F00) >> 8];
 			unsigned char VY = registers[(opcode & 0x00F0) >> 4];
@@ -305,9 +304,11 @@ void Chip::emulateCycle() {
 			for (int y = 0; y < N; y++) {
 				unsigned curPixel = memory[I + y];
 				for (int x = 0; x < 8; x++) {
-					// 64 comes from the fact that screen is 64x32
-					if (gfx[VX + x + (VY + y) * 64] == 1) unsetSprite = true;
-					gfx[VX + x + (VY + y) * 64] ^= 1;
+					if((curPixel & (0x80 >> x)) != 0) {
+						// 64 comes from the fact that screen is 64x32
+						if (gfx[VX + x + (VY + y) * 64] == 1) unsetSprite = true;
+						gfx[VX + x + (VY + y) * 64] ^= 1;
+					}
 				}
 			}
 
