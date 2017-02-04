@@ -105,7 +105,8 @@ void Chip::emulateCycle() {
 	// since the memory locations are 1 byte and opcodes are 2, we need to
 	// combine the two contiguous ones to get current opcode
 	opcode = memory[pc] << 8 | memory[pc + 1];
-
+	printf("Testing: %X\n", opcode);
+	printf("====================\n");
 	// decodes the opcode i.e. determine what it does + execute
 	switch (opcode & 0xF000) {
 		case 0x0000:

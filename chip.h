@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <time.h>
 #include <curses.h>
 

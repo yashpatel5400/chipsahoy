@@ -79,6 +79,7 @@ void drawPixel(int x, int y) {
 void display() {  
 	// sees the update of the emulator in current cycle
 	chip8.emulateCycle();
+	printf("emulated\n");
 
 	// if the refresh flag has reached refresh, updates the screen
 	if (chip8.drawFlag) {
@@ -96,7 +97,7 @@ void display() {
 
 		glutSwapBuffers(); // Flush the OpenGL buffers to the window 
 		chip8.drawFlag = false;
-	} 
+	}
 }
 
 void setupGraphics(int *argc, char **argv) {
@@ -110,7 +111,7 @@ void setupGraphics(int *argc, char **argv) {
 	glutInitWindowPosition(width, height);
 	glutInitWindowSize(x, y);
 	glutInitDisplayMode (GLUT_RGBA | GLUT_DOUBLE);
-	glutCreateWindow ("ChipsAhoy"); 
+	glutCreateWindow("ChipsAhoy"); 
 
 	// Tell GLUT to use the method "display" for rendering  
 	glutDisplayFunc(display); 
